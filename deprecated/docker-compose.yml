@@ -1,0 +1,20 @@
+version: '3'
+services:
+
+  population:
+    image: node:lts-alpine3.10
+    volumes:
+      - ./population/:/app/
+    working_dir: /app/
+    ports:
+      - "7777:3000"
+    command: ["sh", "-c", "npm start"]
+
+  wifi:
+    image: node:lts-alpine3.10
+    working_dir: /app/
+    volumes:
+      - ./wifi/:/app/
+    ports:
+      - "8888:3000"
+    command: ["sh", "-c", "npm start"]
