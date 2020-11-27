@@ -1,5 +1,5 @@
 {
-  "name": "geojson",
+  "name": "population",
   "version": "0.0.0",
   "license": "MIT",
   "scripts": {
@@ -8,17 +8,20 @@
   },
   "dependencies": {
     "d3-scale": "^2.0.0",
+    "d3-scale-chromatic": "^2.0.0",
     "deck.gl": "^8.3.0",
+    "ocular-dev-tools": "^0.2.0",
     "react": "^16.3.0",
     "react-dom": "^16.3.0",
-    "react-map-gl": "^5.0.0"
+    "react-map-gl": "^5.0.0",
+    "react-papaparse": "^3.11.0"
   },
   "devDependencies": {
     "@babel/core": "^7.4.0",
     "@babel/preset-react": "^7.0.0",
     "babel-loader": "^8.0.5",
     "webpack": "^4.20.2",
-    "webpack-cli": "^3.1.2",
+    "webpack-cli": "^3.3.12",
     "webpack-dev-server": "^3.1.1"
   }
 }

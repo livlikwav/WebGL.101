@@ -4,10 +4,10 @@ import {StaticMap} from 'react-map-gl';
 import {AmbientLight, PointLight, LightingEffect} from '@deck.gl/core';
 import {HexagonLayer} from '@deck.gl/aggregation-layers';
 import DeckGL from '@deck.gl/react';
+import {readString} from "react-papaparse";
 
-// Source data CSV
-const DATA_URL =
-  'https://raw.githubusercontent.com/visgl/deck.gl-data/master/examples/3d-heatmap/heatmap-data.csv'; // eslint-disable-line
+// Set your mapbox token here
+const MAPBOX_TOKEN = process.env.MapboxAccessToken; // eslint-disable-line
 
 const ambientLight = new AmbientLight({
   color: [255, 255, 255],
@@ -36,24 +36,32 @@ const material = {
 };
 
 const INITIAL_VIEW_STATE = {
-  longitude: -1.415727,
-  latitude: 52.232395,
-  zoom: 6.6,
-  minZoom: 5,
+  longitude: 126.9779,
+  latitude: 37.5663,
+  zoom: 10,
+  minZoom: 1,
   maxZoom: 15,
   pitch: 40.5,
   bearing: -27
 };
 
-const MAP_STYLE = 'https://basemaps.cartocdn.com/gl/dark-matter-nolabels-gl-style/style.json';
-
+// 더 많은 세팅: https://colorbrewer2.org
+// set "Number of data classes" to 6
 export const colorRange = [
+  [237,248,251],
+  [204,236,230],
+  [153,216,201],
+  [102,194,164],
+  [44,162,95],
+  [0,109,44]
+/*
   [1, 152, 189],
   [73, 227, 206],
   [216, 254, 181],
   [254, 237, 177],
   [254, 173, 84],
   [209, 55, 78]
+  */
 ];
 
 function getTooltip({object}) {
@@ -73,18 +81,20 @@ function getTooltip({object}) {
 /* eslint-disable react/no-deprecated */
 export default function App({
   data,
-  mapStyle = MAP_STYLE,
-  radius = 1000,
+  mapStyle = 'mapbox://styles/mapbox/dark-v9',
+  radius = 600,  
+  lowerPercentile = 0,
   upperPercentile = 100,
   coverage = 1
 }) {
   const layers = [
+    // reference: https://deck.gl/docs/api-reference/aggregation-layers/hexagon-layer
     new HexagonLayer({
-      id: 'heatmap',
+      id: 'wifi',
       colorRange,
       coverage,
       data,
-      elevationRange: [0, 3000],
+      elevationRange: [0, 100],
       elevationScale: data && data.length ? 50 : 0,
       extruded: true,
       getPosition: d => d,
@@ -94,7 +104,7 @@ export default function App({
       material,
 
       transitions: {
-        elevationScale: 3000
+        elevationScale: 50
       }
     })
   ];
@@ -107,18 +117,60 @@ export default function App({
       controller={true}
       getTooltip={getTooltip}
     >
-      <StaticMap reuseMaps mapStyle={mapStyle} preventStyleDiffing={true} />
+      <StaticMap
+        reuseMaps
+        mapStyle={mapStyle}
+        preventStyleDiffing={true}
+        mapboxApiAccessToken={MAPBOX_TOKEN}
+      />
     </DeckGL>
   );
 }
 
-export function renderToDOM(container) {
-  render(<App />, container);
+function is_coordinates_valid(lng,lat) {
+  return (Number.isFinite(lng) 
+    && Number.isFinite(lat) 
+    && lat >= -90 
+    && lat <= 90);
+}
 
-  require('d3-request').csv(DATA_URL, (error, response) => {
-    if (!error) {
-      const data = response.map(d => [Number(d.lng), Number(d.lat)]);
+export function renderToDOM(container) {
+
+    /*
+    // CSV version
+    fetch("locs_wifi_Seoul-UTF8.csv")
+    .then(response => response.text())
+    .then(function(text) {
+
+      const result = readString(text);
+
+      const data = result.data
+          // d[6] = longitude(경도), d[7] = latitude(위도)
+        .map(d => [Number(d[6]), Number(d[7])])
+        // 위도&경도 유효성 검사
+        .filter(d =>  
+          Number.isFinite(d[0]) 
+          && Number.isFinite(d[1]) 
+          && d[1] >= -90 
+          && d[1] <= 90);
+
       render(<App data={data} />, container);
-    }
-  });
+    });
+    */
+
+    // JSON version
+    fetch("locs_wifi_Seoul.json")
+    .then(response => response.json())
+    .then(function(json) {
+
+      const data = json.DATA
+        .map(d => [Number(d.instl_x), Number(d.instl_y)])
+        .filter(d =>  
+          Number.isFinite(d[0]) 
+          && Number.isFinite(d[1]) 
+          && d[1] >= -90 
+          && d[1] <= 90);
+
+      render(<App data={data} />, container);
+    });
 }
