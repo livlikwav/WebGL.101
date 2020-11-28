@@ -54,21 +54,32 @@ function getTooltip({object}) {
     object && {
       html: `\
       <div><b>${object.properties.adm_nm}</b></div>
-      <div>총인구수: ${object.properties.population.total.toLocaleString()} 
-        (남 ${object.properties.population.total_m.toLocaleString()} / 
-        여 ${object.properties.population.total_f.toLocaleString()}) </div>
-      <div>내국인수: ${object.properties.population.citizens.toLocaleString()} 
-        (남 ${object.properties.population.citizens_m.toLocaleString()} / 
-        여 ${object.properties.population.citizens_f.toLocaleString()}) </div>
-      <div>외국인수: ${object.properties.population.foreigners.toLocaleString()} 
-        (남 ${object.properties.population.foreigners_m.toLocaleString()} / 
-        여 ${object.properties.population.foreigners_f.toLocaleString()}) </div>
-      <div>총세대수: ${object.properties.population.households.toLocaleString()} </div>
-      <div>세대당 인구: ${object.properties.population.per_household.toLocaleString()} </div>
-      <div>고령자(65세 이상): ${object.properties.population.seniors.toLocaleString()} </div>
+      <div>(주민등록인구)총인구수: ${object.properties.population.total.toLocaleString()}</div>
+      <div>(생활인구)총생활인구수: ${object.properties.real_population.total.toLocaleString()}</div>
+      <div>(주민등록인구)총내국인수: ${object.properties.population.citizens.toLocaleString()}</div>
+      <div>(주민등록인구)총외국인수: ${object.properties.population.foreigners.toLocaleString()}</div>
   `
     }
   );
+  // return (
+  //   object && {
+  //     html: `\
+  //     <div><b>${object.properties.adm_nm}</b></div>
+  //     <div>총인구수: ${object.properties.population.total.toLocaleString()} 
+  //       (남 ${object.properties.population.total_m.toLocaleString()} / 
+  //       여 ${object.properties.population.total_f.toLocaleString()}) </div>
+  //     <div>내국인수: ${object.properties.population.citizens.toLocaleString()} 
+  //       (남 ${object.properties.population.citizens_m.toLocaleString()} / 
+  //       여 ${object.properties.population.citizens_f.toLocaleString()}) </div>
+  //     <div>외국인수: ${object.properties.population.foreigners.toLocaleString()} 
+  //       (남 ${object.properties.population.foreigners_m.toLocaleString()} / 
+  //       여 ${object.properties.population.foreigners_f.toLocaleString()}) </div>
+  //     <div>총세대수: ${object.properties.population.households.toLocaleString()} </div>
+  //     <div>세대당 인구: ${object.properties.population.per_household.toLocaleString()} </div>
+  //     <div>고령자(65세 이상): ${object.properties.population.seniors.toLocaleString()} </div>
+  // `
+  //   }
+  // );
 }
 
 export default function App({data = DATA_URL, mapStyle = 'mapbox://styles/mapbox/light-v9'}) {
@@ -100,7 +111,8 @@ export default function App({data = DATA_URL, mapStyle = 'mapbox://styles/mapbox
       filled: true,
       extruded: true,
       wireframe: true,
-      getElevation: f => f.properties.population.total * 0.05,
+      // getElevation: f => f.properties.real_population.total * 0.05, // total 생활 인구수로 하고 있음
+      getElevation: f => f.properties.population.total * 0.05, // total 총 인구수로 하고 있음
       getFillColor: f => COLOR_SCALE(f.properties.population.per_household),
       getLineColor: [255, 255, 255],
       pickable: true
@@ -129,13 +141,20 @@ export function renderToDOM(container) {
 
     const DATA_CSV = "stat_population_Seoul.txt";
     const DATA_JSON = 'HangJeongDong_ver20200701.geojson';
+    const NEW_DATA_JSON = 'stat_real_population_Seoul.json';
 
     // 두 파일을 비동기적으로 읽기
     Promise.all([
       fetch(DATA_CSV).then(response => response.text()),
-      fetch(DATA_JSON).then(response => response.json())
+      fetch(DATA_JSON).then(response => response.json()),
+      fetch(NEW_DATA_JSON).then(response => response.json())
     ])
     .then(function(values) {
+      // value[2] = NEW DATA JSON
+      // "TOT_LVPOP_CO":"총생활인구수"
+      // "ADSTRD_CODE_SE":"행정동코드"
+      // 두개다 데이터에는 소문자로 되어 있음
+      // 문제는 행정동 별로 없는 값이 있음!!! 
 
       // parse the CVS file using papaparse library function
       const result = readString(values[0]); 
@@ -165,16 +184,62 @@ export function renderToDOM(container) {
           }
       }
 
+      let dict_real_population = {};
+      for(const record of values[2].DATA){
+        // geojson 행정코드 adm_nm2 10자리 ( 8자리 + 00)
+        // real_population 행정코드 8자리
+        // 그러므로 00을 붙여줌 (기본적으로 ""이므로 String으로 불러온다)
+        let key = record.adstrd_code_se.concat('00');
+        // 제대로 key 10자리로 바꾸는건 확인함
+        // console.log(key);
+        
+        // total_num을 소수점 이하를 없애주기
+        let total_num = parseInt(record.tot_lvpop_co);
+        // dict를 key 기준으로 넣어주기
+        dict_real_population[key] = {
+          total:total_num, //총 생활인구수
+        }
+        // total_num 제대로 찍히는건 확인함!
+        // console.log(total_num);
+        // 확인 완료
+        // console.log(total_num + ' ----- ' + dict_real_population[key].total);
+      }
+      
+      
+      // Geojson 데이터 기반으로 filtered_features를 만듬
       // 서울특별시 데이터만 필터링
-    let filtered_features = values[1].features.filter(f => f.properties.sidonm == "서울특별시");
-
-    // 각 동마다 인구정보를 추가
-    filtered_features.forEach( function(f, idx) {
-      // 각 동이름에는 "서울특별시"와 "구명"이 포함되어 있으므로 이를 제거
-      this[idx].properties.population = 
+      let filtered_features = values[1].features.filter(f => f.properties.sidonm == "서울특별시");
+      
+      // 각 동마다 인구정보를 추가
+      // Geojson의 properties에 그냥 population 필드로 추가해버림
+      // Geojson의 위치정보는 properties가 아닌 geometry에 있음
+      filtered_features.forEach( function(f, idx) {
+        // 각 동이름에는 "서울특별시"와 "구명"이 포함되어 있으므로 이를 제거
+        this[idx].properties.population = 
         dict_population[ f.properties.adm_nm.split(" ")[2] ];
+        // 행정동코드를 비교하여 real_population 값도 추가해야함
+        // geojson 행정코드 adm_nm2 10자리 ( 8자리 + 00)
+        // 따라서 그대로 호출하면 됨
+        this[idx].properties.real_population = dict_real_population[f.properties.adm_cd2];
+        // 확인 완료
+        // console.log(f.properties.adm_cd2);
+        // 확인 완료
+        // {total: 32320}
+        // console.log(dict_real_population[f.properties.adm_cd2]);
+        // 확인 완료
+        // {total: 32320}
+        // console.log(this[idx].properties.real_population);
+        
+        // 혹시나 dict_real_population이 없는지 확인해야함
+        if(!dict_real_population[f.properties.adm_cd2]){
+          console.log(f.properties.adm_cd2 + ' is Empty');
+          // 주민등록인구 수로 채움
+          this[idx].properties.real_population = dict_population[ f.properties.adm_nm.split(" ")[2] ];
+        }
+
     }, filtered_features);
 
+    // Geojson 데이터의 feature에 
     values[1].features = filtered_features;
 
     render(<App data={values[1]} />, container);
