@@ -7,7 +7,8 @@ import {LightingEffect, AmbientLight, _SunLight as SunLight} from '@deck.gl/core
 //import {scaleThreshold} from 'd3-scale';
 import {scaleSequential} from 'd3-scale';
 //import {interpolateRainbow} from 'd3-scale-chromatic';
-import {interpolateOrRd} from 'd3-scale-chromatic';
+// import {interpolateOrRd} from 'd3-scale-chromatic';
+import {interpolateOranges} from 'd3-scale-chromatic';
 import {readString} from "react-papaparse";
 
 // "MapboxAccessToken" 환경변수값
@@ -17,9 +18,10 @@ export const COLOR_SCALE = x =>
   // https://github.com/d3/d3-scale-chromatic
     (
       scaleSequential()
-      .domain([0, 4])
+      .domain([0, 100])
+      // .domain([0, 4])
 //    .interpolator(interpolateRainbow)(x)
-      .interpolator(interpolateOrRd)
+      .interpolator(interpolateOranges)
     )(x) // return a string color "rgb(R,G,B)"
     .slice(4,-1)  // extract "R,G,B"
     .split(',') // spline into an array ["R", "G", "B"]
@@ -54,10 +56,13 @@ function getTooltip({object}) {
     object && {
       html: `\
       <div><b>${object.properties.adm_nm}</b></div>
+      <div>${object.properties.diff_str}</div>
+      <div>|주민등록인구 - 생활인구|: ${object.properties.diff_val.toLocaleString()}</div>
       <div>(주민등록인구)총인구수: ${object.properties.population.total.toLocaleString()}</div>
       <div>(생활인구)총생활인구수: ${object.properties.real_population.total.toLocaleString()}</div>
       <div>(주민등록인구)총내국인수: ${object.properties.population.citizens.toLocaleString()}</div>
       <div>(주민등록인구)총외국인수: ${object.properties.population.foreigners.toLocaleString()}</div>
+      <div>(주민등록인구)세대당 인구: ${object.properties.population.per_household.toLocaleString()}</div>
   `
     }
   );
@@ -111,9 +116,11 @@ export default function App({data = DATA_URL, mapStyle = 'mapbox://styles/mapbox
       filled: true,
       extruded: true,
       wireframe: true,
-      // getElevation: f => f.properties.real_population.total * 0.05, // total 생활 인구수로 하고 있음
-      getElevation: f => f.properties.population.total * 0.05, // total 총 인구수로 하고 있음
-      getFillColor: f => COLOR_SCALE(f.properties.population.per_household),
+      getElevation: f => f.properties.diff_val * 0.1, // 차이로 하고 있음
+      // getElevation: f => f.properties.real_population.total * 0.05, // 생활 인구수로 하고 있음
+      // getElevation: f => f.properties.population.total * 0.05, // 주민등록 인구수로 하고 있음
+      getFillColor: f => COLOR_SCALE(f.properties.real_population.total / 1000),
+      // getFillColor: f => COLOR_SCALE(f.properties.population.per_household),
       getLineColor: [255, 255, 255],
       pickable: true
     })
@@ -235,6 +242,23 @@ export function renderToDOM(container) {
           console.log(f.properties.adm_cd2 + ' is Empty');
           // 주민등록인구 수로 채움
           this[idx].properties.real_population = dict_population[ f.properties.adm_nm.split(" ")[2] ];
+        }
+
+        // 차이값 -인지 확인해보기
+        let doc_total = this[idx].properties.population.total;
+        let real_total = this[idx].properties.real_population.total;
+        if(doc_total < real_total){
+          // console.log('real is big');
+          // 219 개
+          // console.log(doc_total + ' ' + real_total);
+          this[idx].properties.diff_val = real_total - doc_total;
+          this[idx].properties.diff_str = '실 생활인구가 적음';
+        } else{
+          this[idx].properties.diff_val = doc_total - real_total;
+          this[idx].properties.diff_str = '실 생활인구가 많음';
+          
+          // console.log('real is small');
+          // 206 개
         }
 
     }, filtered_features);

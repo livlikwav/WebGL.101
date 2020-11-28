@@ -30,3 +30,14 @@ I use ...
 - To learn latest graphics technology
   - Even lower level 3D graphics APIs: Vulkan, Metal, WebGPU, etc.
   - Latest graphics architectures: NVIDIA RTX platform, etc.
+
+## Getting Started
+
+### 주의할 점
+
+geojson 폴더 내의 data 파일이 너무 커서 push가 불가능했습니다.
+
+- stat_real_population_Seoul.csv
+- stat_real_population_Seoul.json
+
+따라서 실행은 불가능합니다..
