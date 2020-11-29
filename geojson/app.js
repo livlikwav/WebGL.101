@@ -8,7 +8,8 @@ import {LightingEffect, AmbientLight, _SunLight as SunLight} from '@deck.gl/core
 import {scaleSequential} from 'd3-scale';
 //import {interpolateRainbow} from 'd3-scale-chromatic';
 // import {interpolateOrRd} from 'd3-scale-chromatic';
-import {interpolateOranges} from 'd3-scale-chromatic';
+// import {interpolateOranges} from 'd3-scale-chromatic';
+import {interpolateBlues} from 'd3-scale-chromatic';
 import {readString} from "react-papaparse";
 
 // "MapboxAccessToken" 환경변수값
@@ -18,10 +19,8 @@ export const COLOR_SCALE = x =>
   // https://github.com/d3/d3-scale-chromatic
     (
       scaleSequential()
-      .domain([0, 100])
-      // .domain([0, 4])
-//    .interpolator(interpolateRainbow)(x)
-      .interpolator(interpolateOranges)
+      .domain([0, 40]) // 차이값의 최대가 40000미만이므로
+      .interpolator(interpolateBlues)
     )(x) // return a string color "rgb(R,G,B)"
     .slice(4,-1)  // extract "R,G,B"
     .split(',') // spline into an array ["R", "G", "B"]
@@ -56,17 +55,14 @@ function getTooltip({object}) {
     object && {
       html: `\
       <div><b>${object.properties.adm_nm}</b></div>
-      <div>${object.properties.diff_str}</div>
-      <div>|주민등록인구 - 생활인구|: ${object.properties.diff_val.toLocaleString()}</div>
-      <div>(주민등록인구)총인구수: ${object.properties.population.total.toLocaleString()}</div>
-      <div>(생활인구)총생활인구수: ${object.properties.real_population.total.toLocaleString()}</div>
-      <div>(주민등록인구)총내국인수: ${object.properties.population.citizens.toLocaleString()}</div>
-      <div>(주민등록인구)총외국인수: ${object.properties.population.foreigners.toLocaleString()}</div>
-      <div>(주민등록인구)세대당 인구: ${object.properties.population.per_household.toLocaleString()}</div>
-  `
+      <div>${object.properties.diff_str}<b>${object.properties.diff_val.toLocaleString()}</b> )</div>
+      <div>생활인구(내국인): ${object.properties.real_population.citizens.toLocaleString()}</div>
+      <div>주민등록인구(내국인): ${object.properties.population.citizens.toLocaleString()}</div>
+      `
     }
-  );
-  // return (
+    );
+    // <div>|주민등록인구 - 생활인구| (내국인만): ${object.properties.diff_val.toLocaleString()}</div>
+    // return (
   //   object && {
   //     html: `\
   //     <div><b>${object.properties.adm_nm}</b></div>
@@ -116,11 +112,9 @@ export default function App({data = DATA_URL, mapStyle = 'mapbox://styles/mapbox
       filled: true,
       extruded: true,
       wireframe: true,
-      getElevation: f => f.properties.diff_val * 0.1, // 차이로 하고 있음
-      // getElevation: f => f.properties.real_population.total * 0.05, // 생활 인구수로 하고 있음
-      // getElevation: f => f.properties.population.total * 0.05, // 주민등록 인구수로 하고 있음
-      getFillColor: f => COLOR_SCALE(f.properties.real_population.total / 1000),
-      // getFillColor: f => COLOR_SCALE(f.properties.population.per_household),
+      getElevation: f => f.properties.diff_val * 0.1, // 0.1 -> polygon 높이 조절
+      // getElevation: f => f.properties.population.total * 0.05, // 주민등록 인구수
+      getFillColor: f => COLOR_SCALE(f.properties.diff_val / 1000), // 1000 -> 색 범위 조절
       getLineColor: [255, 255, 255],
       pickable: true
     })
@@ -146,9 +140,9 @@ export default function App({data = DATA_URL, mapStyle = 'mapbox://styles/mapbox
 
 export function renderToDOM(container) {
 
-    const DATA_CSV = "stat_population_Seoul.txt";
-    const DATA_JSON = 'HangJeongDong_ver20200701.geojson';
-    const NEW_DATA_JSON = 'stat_real_population_Seoul.json';
+    const DATA_CSV = "stat_population_Seoul.txt"; // 주민등록인구 데이터
+    const DATA_JSON = 'HangJeongDong_ver20200701.geojson'; // 행정동 geojson
+    const NEW_DATA_JSON = 'stat_real_population_Seoul.json'; // 생활인구 데이터 (내국인)
 
     // 두 파일을 비동기적으로 읽기
     Promise.all([
@@ -157,11 +151,11 @@ export function renderToDOM(container) {
       fetch(NEW_DATA_JSON).then(response => response.json())
     ])
     .then(function(values) {
+      // value[0] = DATA_CSV
+      // value[1] = DATA_JSON
       // value[2] = NEW DATA JSON
-      // "TOT_LVPOP_CO":"총생활인구수"
-      // "ADSTRD_CODE_SE":"행정동코드"
-      // 두개다 데이터에는 소문자로 되어 있음
-      // 문제는 행정동 별로 없는 값이 있음!!! 
+      // "tot_lvpop_co":"총생활인구수"
+      // "adstrd_code_se":"행정동코드"
 
       // parse the CVS file using papaparse library function
       const result = readString(values[0]); 
@@ -176,40 +170,36 @@ export function renderToDOM(container) {
           let key = row[2].replaceAll(".","·"); 
 
           dict_population[key] = {
-            total:parseIntComma(row[4]),  // 총인구수
-            total_m:parseIntComma(row[5]),  // 남성인구수
-            total_f:parseIntComma(row[6]),  // 여성인구수
+            // total:parseIntComma(row[4]),  // 총인구수
+            // total_m:parseIntComma(row[5]),  // 남성인구수
+            // total_f:parseIntComma(row[6]),  // 여성인구수
             citizens:parseIntComma(row[7]), // 총내국인수
-            citizens_m:parseIntComma(row[8]), // 남자내국인수
-            citizens_f:parseIntComma(row[9]), // 여자내국인수
-            foreigners:parseIntComma(row[10]), // 총외국인수
-            foreigners_m:parseIntComma(row[11]), // 남자외국인수
-            foreigners_f:parseIntComma(row[12]), // 여자외국인수
-            households:parseIntComma(row[3]), // 세대수
-            per_household:parseIntComma(row[13]), // 세대별 평균 인구수
-            seniors:parseIntComma(row[14]),  // 고령자(65세 이상)
+            // citizens_m:parseIntComma(row[8]), // 남자내국인수
+            // citizens_f:parseIntComma(row[9]), // 여자내국인수
+            // foreigners:parseIntComma(row[10]), // 총외국인수
+            // foreigners_m:parseIntComma(row[11]), // 남자외국인수
+            // foreigners_f:parseIntComma(row[12]), // 여자외국인수
+            // households:parseIntComma(row[3]), // 세대수
+            // per_household:parseIntComma(row[13]), // 세대별 평균 인구수
+            // seniors:parseIntComma(row[14]),  // 고령자(65세 이상)
           }
       }
 
+      // 실 생활인구 데이터 전처리 (10자리 행정동코드를 key로 사용)
       let dict_real_population = {};
       for(const record of values[2].DATA){
-        // geojson 행정코드 adm_nm2 10자리 ( 8자리 + 00)
-        // real_population 행정코드 8자리
-        // 그러므로 00을 붙여줌 (기본적으로 ""이므로 String으로 불러온다)
+        // geojson 데이터의 행정코드인 adm_nm2 10자리이다 ( 8자리 + 00)
+        // 하지만, 실 생활인구 데이터의 행정코드 8자리이다.
+        // 따라서 00을 붙여줌 (기본적으로 ""이므로 String으로 불러온다)
         let key = record.adstrd_code_se.concat('00');
-        // 제대로 key 10자리로 바꾸는건 확인함
-        // console.log(key);
         
-        // total_num을 소수점 이하를 없애주기
+        // tot_lvpop_co -> 총 생활인구 수
+        // 실수 값이므로 정수로 치환 (소수점 버림)
         let total_num = parseInt(record.tot_lvpop_co);
-        // dict를 key 기준으로 넣어주기
+
         dict_real_population[key] = {
-          total:total_num, //총 생활인구수
+          citizens : total_num, //총 생활인구수 (내국인)
         }
-        // total_num 제대로 찍히는건 확인함!
-        // console.log(total_num);
-        // 확인 완료
-        // console.log(total_num + ' ----- ' + dict_real_population[key].total);
       }
       
       
@@ -218,52 +208,41 @@ export function renderToDOM(container) {
       let filtered_features = values[1].features.filter(f => f.properties.sidonm == "서울특별시");
       
       // 각 동마다 인구정보를 추가
-      // Geojson의 properties에 그냥 population 필드로 추가해버림
-      // Geojson의 위치정보는 properties가 아닌 geometry에 있음
       filtered_features.forEach( function(f, idx) {
+        // 주민등록인구 데이터 추가 (행정동 이름으로)
         // 각 동이름에는 "서울특별시"와 "구명"이 포함되어 있으므로 이를 제거
         this[idx].properties.population = 
         dict_population[ f.properties.adm_nm.split(" ")[2] ];
-        // 행정동코드를 비교하여 real_population 값도 추가해야함
-        // geojson 행정코드 adm_nm2 10자리 ( 8자리 + 00)
-        // 따라서 그대로 호출하면 됨
-        this[idx].properties.real_population = dict_real_population[f.properties.adm_cd2];
-        // 확인 완료
-        // console.log(f.properties.adm_cd2);
-        // 확인 완료
-        // {total: 32320}
-        // console.log(dict_real_population[f.properties.adm_cd2]);
-        // 확인 완료
-        // {total: 32320}
-        // console.log(this[idx].properties.real_population);
-        
-        // 혹시나 dict_real_population이 없는지 확인해야함
-        if(!dict_real_population[f.properties.adm_cd2]){
-          console.log(f.properties.adm_cd2 + ' is Empty');
-          // 주민등록인구 수로 채움
-          this[idx].properties.real_population = dict_population[ f.properties.adm_nm.split(" ")[2] ];
+
+        // 주민등록인구 총내국인수 결측치 확인
+        // if(!this[idx].properties.population.citizens){
+        //   console.log('empty citizens');
+          // citizens가 빈 값은 없다.
+        // }
+
+        // 실 생활인구 데이터 추가 (행정동코드 10자리를 기준으로)
+        let new_data_value = dict_real_population[f.properties.adm_cd2];
+        if(!new_data_value){
+          console.log('adm_cd2 [' + f.properties.adm_cd2 + '] is Empty');
+          // 결측치 처리 (주민등록 총 내국인 수로 채움)
+          this[idx].properties.real_population = this[idx].properties.population;
+        } else{
+          this[idx].properties.real_population = new_data_value;
         }
 
-        // 차이값 -인지 확인해보기
-        let doc_total = this[idx].properties.population.total;
-        let real_total = this[idx].properties.real_population.total;
-        if(doc_total < real_total){
-          // console.log('real is big');
-          // 219 개
-          // console.log(doc_total + ' ' + real_total);
+        // 두 데이터간 차이값 계산
+        let doc_total = this[idx].properties.population.citizens; // citizends -> 총 내국인수
+        let real_total = this[idx].properties.real_population.citizens; // 총 내국인 생활인구 수
+        if(doc_total < real_total){ // 219 개
           this[idx].properties.diff_val = real_total - doc_total;
-          this[idx].properties.diff_str = '실 생활인구가 적음';
-        } else{
+          this[idx].properties.diff_str = '실 생활인구가 많음 ( +';
+        } else{ // 206 개
           this[idx].properties.diff_val = doc_total - real_total;
-          this[idx].properties.diff_str = '실 생활인구가 많음';
-          
-          // console.log('real is small');
-          // 206 개
+          this[idx].properties.diff_str = '실 생활인구가 적음 ( -';
         }
 
     }, filtered_features);
 
-    // Geojson 데이터의 feature에 
     values[1].features = filtered_features;
 
     render(<App data={values[1]} />, container);
