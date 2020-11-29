@@ -45,23 +45,14 @@ const INITIAL_VIEW_STATE = {
   bearing: -27
 };
 
-// 더 많은 세팅: https://colorbrewer2.org
-// set "Number of data classes" to 6
+// RED COLOR SCALE
 export const colorRange = [
-  [237,248,251],
-  [204,236,230],
-  [153,216,201],
-  [102,194,164],
-  [44,162,95],
-  [0,109,44]
-/*
-  [1, 152, 189],
-  [73, 227, 206],
-  [216, 254, 181],
-  [254, 237, 177],
-  [254, 173, 84],
-  [209, 55, 78]
-  */
+  [254,229,217],
+  [252,187,161],
+  [252,146,114],
+  [251,106,74],
+  [222,45,38],
+  [165,15,21],
 ];
 
 function getTooltip({object}) {
@@ -72,10 +63,15 @@ function getTooltip({object}) {
   const lng = object.position[0];
   const count = object.points.length;
 
-  return `\
-    latitude: ${Number.isFinite(lat) ? lat.toFixed(6) : ''}
-    longitude: ${Number.isFinite(lng) ? lng.toFixed(6) : ''}
-    ${count} Accidents`;
+  return (
+    {
+      html: `\
+      <div>소방대상물의 수 = <b>${count}</b></div>
+      <div>위도, 경도 = (${Number.isFinite(lat) ? lat.toFixed(6) : ''}, ${Number.isFinite(lng) ? lng.toFixed(6) : ''})</div>
+      `
+    }
+  );
+    
 }
 
 /* eslint-disable react/no-deprecated */
@@ -90,7 +86,7 @@ export default function App({
   const layers = [
     // reference: https://deck.gl/docs/api-reference/aggregation-layers/hexagon-layer
     new HexagonLayer({
-      id: 'wifi',
+      id: 'fire_target',
       colorRange,
       coverage,
       data,
@@ -134,43 +130,40 @@ function is_coordinates_valid(lng,lat) {
     && lat <= 90);
 }
 
+
+
 export function renderToDOM(container) {
+  
+      // 소방대상물 데이터
+      fetch("fire_target_pos.json")
+      .then(response => response.json())
+      .then(function(json) {
 
-    /*
-    // CSV version
-    fetch("locs_wifi_Seoul-UTF8.csv")
-    .then(response => response.text())
-    .then(function(text) {
+          const data = json.DATA
+            .map(d => [Number(d.lng), Number(d.lat)])
+            .filter(d =>  
+              Number.isFinite(d[0]) 
+              && Number.isFinite(d[1]) 
+              && d[1] >= -90 
+              && d[1] <= 90);
+    
+          render(<App data={data} />, container);
+        });
 
-      const result = readString(text);
+      // // JSON version
+      // fetch("locs_wifi_Seoul.json")
+      // .then(response => response.json())
+      // .then(function(json) {
+    
+      //     const data = json.DATA
+      //       .map(d => [Number(d.instl_x), Number(d.instl_y)])
+      //       .filter(d =>  
+      //         Number.isFinite(d[0]) 
+      //         && Number.isFinite(d[1]) 
+      //         && d[1] >= -90 
+      //         && d[1] <= 90);
+    
+      //     render(<App data={data} />, container);
+      //   });
 
-      const data = result.data
-          // d[6] = longitude(경도), d[7] = latitude(위도)
-        .map(d => [Number(d[6]), Number(d[7])])
-        // 위도&경도 유효성 검사
-        .filter(d =>  
-          Number.isFinite(d[0]) 
-          && Number.isFinite(d[1]) 
-          && d[1] >= -90 
-          && d[1] <= 90);
-
-      render(<App data={data} />, container);
-    });
-    */
-
-    // JSON version
-    fetch("locs_wifi_Seoul.json")
-    .then(response => response.json())
-    .then(function(json) {
-
-      const data = json.DATA
-        .map(d => [Number(d.instl_x), Number(d.instl_y)])
-        .filter(d =>  
-          Number.isFinite(d[0]) 
-          && Number.isFinite(d[1]) 
-          && d[1] >= -90 
-          && d[1] <= 90);
-
-      render(<App data={data} />, container);
-    });
-}
+      }
