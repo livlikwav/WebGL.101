@@ -105,7 +105,7 @@ export default function App({data = DATA_URL, mapStyle = 'mapbox://styles/mapbox
 
     // reference: https://deck.gl/docs/api-reference/layers/geojson-layer
     new GeoJsonLayer({
-      id: 'population',
+      id: 'real_population',
       data,
       opacity: 0.9,
       stroked: false,
