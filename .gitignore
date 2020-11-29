@@ -1,7 +1,12 @@
 # Custom
 
 LOCAL.md
-/examples/
+/PRIVATE/
+
+# Too large file
+
+stat_real_population_Seoul.csv
+stat_real_population_Seoul.json
 
 # Created by https://www.toptal.com/developers/gitignore/api/node,osx,vscode,react
 # Edit at https://www.toptal.com/developers/gitignore?templates=node,osx,vscode,react
